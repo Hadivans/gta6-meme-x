@@ -19,7 +19,7 @@
 // Run it locally the way the kit documents:
 //   mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const BOT_DIR = process.env.MAKEFUN_BOT_DIR ?? "/bot";
@@ -30,6 +30,22 @@ const TARGET = join(OUTPUT_DIR, "POST.json");
 
 if (!existsSync(SOURCE)) {
   console.error(`POST.json not found in ${BOT_DIR} -- nothing to hand in.`);
+  process.exit(1);
+}
+
+// Validate the hand-in before copying: POST.json must parse and its
+// `url` must be a real X status address (https://x.com/<handle>/status/<digits>).
+// A placeholder or a mistyped URL would hand the grader a dead link, so
+// refuse loudly here instead of copying a bad file.
+let url: unknown;
+try {
+  url = (JSON.parse(readFileSync(SOURCE, "utf8")) as { url?: unknown }).url;
+} catch {
+  console.error(`POST.json in ${BOT_DIR} is not valid JSON -- fix it before submitting.`);
+  process.exit(1);
+}
+if (typeof url !== "string" || !/^https:\/\/x\.com\/[A-Za-z0-9_]+\/status\/\d+$/.test(url)) {
+  console.error(`POST.json url is not an X status address (expected https://x.com/<handle>/status/<digits>): ${String(url)}`);
   process.exit(1);
 }
 
